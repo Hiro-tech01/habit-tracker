@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>習慣トラッカー</title>
+<style>
+:root{color-scheme:light;--bg:#f6f5f1;--card:#fff;--text:#1f2328;--sub:#6b7280;--accent:#2f7d5b;--accent-t:#fff;--border:#e3e1da;--danger:#c0392b;--chip:#eceae3;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#16181a;--card:#212427;--text:#eceff1;--sub:#9aa3ab;--accent:#4cc08a;--accent-t:#0b1f16;--border:#33383c;--danger:#ef7a6c;--chip:#2c3033}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#16181a;--card:#212427;--text:#eceff1;--sub:#9aa3ab;--accent:#4cc08a;--accent-t:#0b1f16;--border:#33383c;--danger:#ef7a6c;--chip:#2c3033}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 -apple-system,"Hiragino Sans","Noto Sans JP",system-ui,sans-serif}
+main{max-width:640px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:4px 0 12px}
+.tabs{display:flex;gap:6px;margin-bottom:14px}
+.tabs button{flex:1;padding:10px 0;border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:10px;font-size:15px}
+.tabs button.on{background:var(--accent);color:var(--accent-t);border-color:var(--accent)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px}
+.nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
+.nav b{font-size:17px;text-align:center;flex:1}
+.nav button,.btn{border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:10px;padding:8px 14px;font-size:15px}
+.btn.pri{background:var(--accent);color:var(--accent-t);border-color:var(--accent)}
+.btn.del{color:var(--danger)}
+.bar{height:8px;background:var(--chip);border-radius:4px;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:var(--accent)}
+.row{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--border)}
+.row:first-child{border-top:0}
+.ck{width:32px;height:32px;border-radius:50%;border:2px solid var(--border);background:transparent;color:var(--accent-t);font-size:18px;flex:none;padding:0}
+.ck.on{background:var(--accent);border-color:var(--accent)}.ck.plan:not(.on){border-style:dashed;border-color:var(--accent)}
+.row .t{flex:1;min-width:0}
+.row .t div{overflow-wrap:anywhere}
+.sub{color:var(--sub);font-size:13px}
+.done .t div:first-child{text-decoration:line-through;color:var(--sub)}
+.scroll{padding:10px 8px}.hd{touch-action:none;cursor:grab;padding:8px 6px;color:var(--sub);font-size:20px;line-height:1;user-select:none;flex:none}.row.drag{opacity:.6;background:var(--chip)}
+table{border-collapse:collapse;width:100%;table-layout:fixed}
+th,td{text-align:center;padding:6px 2px;font-size:13px}
+th:first-child,td:first-child{text-align:left;padding-left:0;width:30%;overflow-wrap:anywhere}
+td .ck{width:26px;height:26px;font-size:14px}
+th.today{color:var(--accent)}
+label.f{display:block;font-size:13px;color:var(--sub);margin:10px 0 4px}
+input[type=text],input[type=date]{width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-size:16px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{padding:8px 12px;border-radius:18px;border:1px solid var(--border);background:var(--chip);color:var(--text);font-size:14px}
+.chip.on{background:var(--accent);color:var(--accent-t);border-color:var(--accent)}
+.inl{display:flex;gap:8px}
+.err{color:var(--danger);font-size:14px;margin-top:8px}textarea{width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font:13px/1.4 ui-monospace,monospace}
+.acts{display:flex;gap:8px;margin-top:14px}
+.empty{color:var(--sub);text-align:center;padding:18px 0}
+</style></head>
+<body><main>
+<h1>習慣トラッカー</h1>
+<div class="tabs" id="tabs"></div>
+<div id="app"></div>
+</main>
+<script>
+const DN=['日','月','火','水','木','金','土'],KEY='habit-app-v1';
+let S={habits:[],logs:{}};
+try{const r=localStorage.getItem(KEY);if(r)S=JSON.parse(r)}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const pad=n=>String(n).padStart(2,'0');
+const fmt=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const parse=s=>new Date(s+'T00:00:00');
+const addDays=(s,n)=>{const d=parse(s);d.setDate(d.getDate()+n);return fmt(d)};
+const today=()=>fmt(new Date());
+const wkStart=s=>addDays(s,-((parse(s).getDay()+6)%7));
+const md=s=>{const d=parse(s);return (d.getMonth()+1)+'/'+d.getDate()};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let view='today',cur=today(),wk=wkStart(today()),editId=null;
+let form={name:'',type:'daily',days:[],dates:[],target:3,err:''};
+
+function isDue(h,s){
+  if(h.type==='dates')return h.dates.includes(s);
+  if(s<h.start)return false;
+  if(h.type==='count')return true;
+  return h.type==='daily'||h.days.includes(parse(s).getDay());
+}
+const done=(h,s)=>(S.logs[s]||[]).includes(h.id);
+function toggle(id,s){
+  const a=S.logs[s]||[],i=a.indexOf(id);
+  if(i>=0)a.splice(i,1);else a.push(id);
+  S.logs[s]=a;save();
+}
+function weekCount(h,s){const w=wkStart(s);let n=0;for(let i=0;i<7;i++)if(done(h,addDays(w,i)))n++;return n}
+function streak(h){
+  if(h.type==='count'){let w=wkStart(today()),n=weekCount(h,w)>=h.target?1:0;for(let i=0;i<60;i++){w=addDays(w,-7);if(addDays(w,6)<h.start)break;if(weekCount(h,w)>=h.target)n++;else break}return n}
+  let s=today(),n=0;
+  if(isDue(h,s)&&!done(h,s))s=addDays(s,-1);
+  for(let i=0;i<400;i++){
+    if(isDue(h,s)){if(done(h,s))n++;else break}
+    s=addDays(s,-1);
+  }
+  return n;
+}
+function label(h){
+  if(h.type==='count')return '週'+h.target+'回'+(h.days.length?'(目安:'+[...h.days].sort((a,b)=>(a+6)%7-(b+6)%7).map(d=>DN[d]).join('・')+')':'');
+  if(h.type==='daily')return '毎日';
+  if(h.type==='week')return '毎週 '+[...h.days].sort().map(d=>DN[d]).join('・');
+  const d=[...h.dates].sort();
+  return '日付指定 '+d.slice(0,4).map(md).join(', ')+(d.length>4?' ほか'+(d.length-4)+'件':'');
+}
+const ck=(on,id,s,x='')=>`<button class="ck ${on?'on':''} ${x}" data-a="tog" data-id="${id}" data-d="${s}" aria-label="完了">${on?'✓':''}</button>`;
+
+function renderTabs(){
+  const t=[['today','今日'],['week','週間'],['manage','習慣管理']];
+  document.getElementById('tabs').innerHTML=t.map(([k,n])=>`<button class="${view===k?'on':''}" data-a="tab" data-v="${k}">${n}</button>`).join('');
+}
+function vToday(){
+  const due=S.habits.filter(h=>h.type!=='count'&&isDue(h,cur)),n=due.filter(h=>done(h,cur)).length;
+  const d=parse(cur),isT=cur===today();
+  let h=`<div class="nav"><button data-a="prev">‹</button><b>${d.getMonth()+1}月${d.getDate()}日(${DN[d.getDay()]})${isT?' ・今日':''}</b><button data-a="next">›</button></div>`;
+  if(!isT)h+=`<div style="text-align:center;margin:-4px 0 12px"><button class="btn" data-a="goto">今日に戻る</button></div>`;
+  h+=`<div class="card"><div>${n} / ${due.length} 完了</div><div class="bar"><i style="width:${due.length?n/due.length*100:0}%"></i></div></div><div class="card">`;
+  if(!due.length)h+=`<div class="empty">${S.habits.length?'この日の習慣はありません':'「習慣管理」から習慣を登録しましょう'}</div>`;
+  h+=due.map(x=>{const st=streak(x);return `<div class="row ${done(x,cur)?'done':''}">${ck(done(x,cur),x.id,cur)}<div class="t"><div>${esc(x.name)}</div><div class="sub">${label(x)}${st>1?' ・🔥'+st+'日連続':''}</div></div></div>`}).join('');
+  h+='</div>';
+  const cs=S.habits.filter(x=>x.type==='count'&&cur>=x.start);
+  if(cs.length)h+='<div class="card"><b>週間目標</b>'+cs.map(x=>{const n=weekCount(x,cur),st=streak(x),pl=x.days.includes(d.getDay());return `<div class="row ${done(x,cur)?'done':''}">${ck(done(x,cur),x.id,cur,pl?'plan':'')}<div class="t"><div>${esc(x.name)}</div><div class="sub">今週 ${n}/${x.target}回${n>=x.target?' ✓達成'+(n>x.target?'(+'+(n-x.target)+'回)':''):' ・あと'+(x.target-n)+'回'}${pl?' ・予定日':''}${st>0?' ・🔥'+st+'週連続':''}</div></div></div>`}).join('')+'</div>';
+  return h;
+}
+function vWeek(){
+  const days=[...Array(7)].map((_,i)=>addDays(wk,i)),t=today();
+  let h=`<div class="nav"><button data-a="wprev">‹</button><b>${md(days[0])} – ${md(days[6])}</b><button data-a="wnext">›</button></div><div class="card scroll">`;
+  if(!S.habits.length)return h+'<div class="empty">習慣が未登録です</div></div>';
+  h+='<table><tr><th></th>'+days.map(s=>`<th class="${s===t?'today':''}">${DN[parse(s).getDay()]}<br>${parse(s).getDate()}</th>`).join('')+'</tr>';
+  h+=S.habits.map(x=>`<tr><td>${esc(x.name)}${x.type==='count'?`<div class="sub">${weekCount(x,wk)}/${x.target}</div>`:''}</td>`+days.map(s=>`<td>${isDue(x,s)?ck(done(x,s),x.id,s,x.type==='count'&&x.days.includes(parse(s).getDay())?'plan':''):'<span class="sub">–</span>'}</td>`).join('')+'</tr>').join('');
+  return h+'</table></div>';
+}
+function vManage(){
+  const f=form;
+  let h=`<div class="card"><b>${editId?'習慣を編集':'習慣を追加'}</b>
+<label class="f">名前</label><input type="text" id="nm" value="${esc(f.name)}" placeholder="例:ランニング">
+<label class="f">頻度</label><div class="chips">${[['daily','毎日'],['week','曜日を指定'],['count','週N回'],['dates','日付を指定']].map(([k,n])=>`<button class="chip ${f.type===k?'on':''}" data-a="type" data-v="${k}">${n}</button>`).join('')}</div>`;
+  if(f.type==='count')h+=`<label class="f">週の回数</label><div class="chips">${[1,2,3,4,5,6,7].map(n=>`<button class="chip ${f.target===n?'on':''}" data-a="tgt" data-v="${n}">${n}回</button>`).join('')}</div>`;
+  if(f.type==='week'||f.type==='count')h+=`<label class="f">${f.type==='count'?'予定曜日(目安・任意。他の曜日への振替OK)':'曜日(複数可)'}</label><div class="chips">${[1,2,3,4,5,6,0].map(d=>`<button class="chip ${f.days.includes(d)?'on':''}" data-a="dow" data-v="${d}">${DN[d]}</button>`).join('')}</div>`;
+  if(f.type==='dates')h+=`<label class="f">日付(追加してください)</label><div class="inl"><input type="date" id="dt"><button class="btn" data-a="adddate">追加</button></div><div class="chips" style="margin-top:8px">${[...f.dates].sort().map(s=>`<button class="chip on" data-a="rmdate" data-v="${s}">${md(s)} ✕</button>`).join('')}</div>`;
+  if(f.err)h+=`<div class="err">${f.err}</div>`;
+  h+=`<div class="acts"><button class="btn pri" data-a="save">${editId?'更新':'登録'}</button>${editId?'<button class="btn" data-a="cancel">キャンセル</button>':''}</div></div><div class="card"><b>登録済み(${S.habits.length})</b>`;
+  if(!S.habits.length)h+='<div class="empty">まだありません</div>';
+  h+=S.habits.map(x=>`<div class="row" data-rid="${x.id}"><span class="hd" aria-label="ドラッグで並び替え">⠿</span><div class="t"><div>${esc(x.name)}</div><div class="sub">${label(x)}</div></div><button class="btn" data-a="edit" data-id="${x.id}">編集</button><button class="btn del" data-a="del" data-id="${x.id}">${delArm===x.id?'本当に削除':'削除'}</button></div>`).join('');
+  h+='</div>';
+  h+=`<div class="card"><b>エクスポート / インポート</b><div class="sub" style="margin-top:4px">Notionのコードブロックに貼り付けて保管できます</div><div class="acts"><button class="btn pri" data-a="exp">設定をコピー</button><button class="btn" data-a="expall">記録も含めてコピー</button></div><label class="f">インポート(コピーしたテキストを貼り付け)</label><textarea id="io" rows="5">${esc(io.text)}</textarea><div class="acts"><button class="btn" data-a="imp">インポート(置き換え)</button></div>${io.msg?`<div class="sub" style="margin-top:8px">${esc(io.msg)}</div>`:''}</div>`;
+  return h;
+}
+function render(){
+  renderTabs();
+  document.getElementById('app').innerHTML=view==='today'?vToday():view==='week'?vWeek():vManage();
+}
+function resetForm(){editId=null;form={name:'',type:'daily',days:[],dates:[],target:3,err:''}}
+
+document.addEventListener('input',e=>{if(e.target.id==='nm')form.name=e.target.value;if(e.target.id==='io'){io.text=e.target.value;io.armed=false}});
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-a]');if(!b)return;
+  const a=b.dataset.a,v=b.dataset.v,id=b.dataset.id;
+  if(a!=='del')delArm=null;
+  if(a!=='imp')io.armed=false;
+  if(a==='tab'){view=v;if(v!=='manage')resetForm()}
+  else if(a==='prev')cur=addDays(cur,-1);
+  else if(a==='next')cur=addDays(cur,1);
+  else if(a==='goto')cur=today();
+  else if(a==='wprev')wk=addDays(wk,-7);
+  else if(a==='wnext')wk=addDays(wk,7);
+  else if(a==='tog')toggle(id,b.dataset.d);
+  else if(a==='type'){form.type=v;form.err=''}
+  else if(a==='tgt')form.target=+v;
+  else if(a==='dow'){const d=+v,i=form.days.indexOf(d);i>=0?form.days.splice(i,1):form.days.push(d)}
+  else if(a==='adddate'){const x=document.getElementById('dt').value;if(x&&!form.dates.includes(x))form.dates.push(x)}
+  else if(a==='rmdate')form.dates=form.dates.filter(s=>s!==v);
+  else if(a==='cancel')resetForm();
+  else if(a==='edit'){const h=S.habits.find(x=>x.id===id);if(h){editId=id;form={name:h.name,type:h.type,days:[...h.days],dates:[...h.dates],target:h.target||3,err:''};scrollTo(0,0)}}
+  else if(a==='del'){if(delArm!==id)delArm=id;else{S.habits=S.habits.filter(x=>x.id!==id);for(const k in S.logs)S.logs[k]=S.logs[k].filter(i=>i!==id);save();if(editId===id)resetForm();delArm=null}}
+  else if(a==='exp'||a==='expall'){doExport(a==='expall');return}
+  else if(a==='imp')doImport();
+  else if(a==='save'){
+    const n=form.name.trim();
+    if(!n)form.err='名前を入力してください';
+    else if(form.type==='week'&&!form.days.length)form.err='曜日を1つ以上選んでください';
+    else if(form.type==='dates'&&!form.dates.length)form.err='日付を1つ以上追加してください';
+    else{
+      const o={name:n,type:form.type,days:(form.type==='week'||form.type==='count')?[...form.days]:[],dates:form.type==='dates'?[...form.dates]:[],target:form.type==='count'?form.target:0};
+      if(editId){const h=S.habits.find(x=>x.id===editId);Object.assign(h,o)}
+      else S.habits.push({id:'h'+Date.now().toString(36),start:today(),...o});
+      save();resetForm();
+    }
+  }
+  render();
+});
+let io={text:'',msg:''};
+function exportText(withLogs){
+  return '```json\n{"app":"habit-tracker","v":1,\n"habits":[\n'+S.habits.map(h=>JSON.stringify(h)).join(',\n')+'\n]'+(withLogs?',\n"logs":'+JSON.stringify(S.logs):'')+'}\n```';
+}
+async function doExport(w){
+  const t=exportText(w);let ok=false;
+  try{await navigator.clipboard.writeText(t);ok=true}catch(e){}
+  if(!ok){try{const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();ok=document.execCommand('copy');a.remove()}catch(e){}}
+  io.msg=ok?'クリップボードにコピーしました':'コピーできませんでした。下の欄に出力したので手動でコピーしてください';
+  if(!ok)io.text=t;
+  render();
+}
+function doImport(){
+  try{
+    const t=io.text.trim().replace(/^```\w*\s*/,'').replace(/\s*```$/,'');
+    const o=JSON.parse(t);
+    if(!o||!Array.isArray(o.habits))throw 0;
+    const dt=s=>typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s);
+    const seen=new Set(),hs=[];
+    for(const h of o.habits){
+      if(!h||typeof h.name!=='string'||!h.name.trim()||!['daily','week','count','dates'].includes(h.type))continue;
+      const id=typeof h.id==='string'&&h.id&&!seen.has(h.id)?h.id:'h'+Date.now().toString(36)+hs.length;
+      seen.add(id);
+      hs.push({id,name:h.name.trim(),type:h.type,target:Number.isInteger(h.target)&&h.target>=1&&h.target<=7?h.target:3,start:dt(h.start)?h.start:today(),days:Array.isArray(h.days)?h.days.filter(d=>Number.isInteger(d)&&d>=0&&d<=6):[],dates:Array.isArray(h.dates)?h.dates.filter(dt):[]});
+    }
+    if(!hs.length)throw 0;
+    if(!io.armed){io.armed=true;io.msg='現在の習慣を'+hs.length+'件に置き換えます。よろしければもう一度「インポート」を押してください';return}io.armed=false;
+    S.habits=hs;
+    if(o.logs&&typeof o.logs==='object'){const L={};for(const k in o.logs)if(Array.isArray(o.logs[k]))L[k]=o.logs[k].filter(i=>seen.has(i));S.logs=L}
+    else{for(const k in S.logs)S.logs[k]=S.logs[k].filter(i=>seen.has(i))}
+    save();io.text='';io.msg=hs.length+'件をインポートしました';
+  }catch(e){io.armed=false;io.msg='読み込めませんでした。エクスポートしたテキストをそのまま貼り付けてください'}
+}
+let drag=null,delArm=null;
+document.addEventListener('pointerdown',e=>{
+  const h=e.target.closest('.hd');if(!h)return;
+  drag=h.closest('.row');drag.classList.add('drag');
+  try{h.setPointerCapture(e.pointerId)}catch(x){}
+  e.preventDefault();
+});
+document.addEventListener('pointermove',e=>{
+  if(!drag)return;
+  for(const r of drag.parentNode.querySelectorAll('.row[data-rid]')){
+    if(r===drag)continue;
+    const b=r.getBoundingClientRect();
+    if(e.clientY>b.top&&e.clientY<b.bottom){e.clientY<b.top+b.height/2?r.before(drag):r.after(drag);break}
+  }
+});
+function endDrag(){
+  if(!drag)return;
+  const ids=[...drag.parentNode.querySelectorAll('.row[data-rid]')].map(r=>r.dataset.rid);
+  S.habits.sort((a,b)=>ids.indexOf(a.id)-ids.indexOf(b.id));
+  save();drag=null;render();
+}
+document.addEventListener('pointerup',endDrag);
+document.addEventListener('pointercancel',endDrag);
+render();
+</script></body></html>
+
